@@ -62,7 +62,7 @@ export function bookCss(config: BookConfig) {
   @bottom-center { content: none; }
 }
 .pagedjs_page {
-  font-family: 'Noto Serif JP', 'Yu Mincho', 'YuMincho', 'Hiragino Mincho ProN', serif;
+  font-family: 'Shippori Mincho', 'Yu Mincho', 'YuMincho', 'Hiragino Mincho ProN', serif;
   font-size: ${config.fontSize}pt;
   line-height: ${config.lineHeight};
   color: #2b2622;
@@ -87,7 +87,7 @@ h1, h2, h3 { break-after: avoid; }
 p { margin: 0; text-align: justify; text-indent: 1em; orphans: 2; widows: 2; }
 blockquote { margin: 1em 0; padding-left: 1em; border-left: 2px solid #ddd3c8; color: #6b625a; }
 pre { font-size: 0.85em; background: #f7f3ee; padding: 0.8em 1em; border-radius: 4px; white-space: pre-wrap; }
-code { font-family: 'Cascadia Mono', Consolas, monospace; font-size: 0.9em; }
+code { font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 0.9em; }
 img { max-width: 100%; display: block; margin: 1em auto; }
 table { border-collapse: collapse; margin: 1em auto; font-size: 0.9em; }
 th, td { border-bottom: 1px solid #ddd3c8; padding: 0.3em 0.8em; }

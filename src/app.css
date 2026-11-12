@@ -8,8 +8,9 @@
 	--muted: #8a8077;
 	--accent: #b0714a;
 
-	--serif: "Noto Serif JP", "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
-	--sans: "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+	--serif: "Shippori Mincho", "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
+	--sans: "Inter Variable", "Inter", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+	--mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 
 	font-family: var(--sans);
 	color: var(--ink);
@@ -57,9 +58,9 @@ body {
 	--crepe-color-selected: #ecd9c6;
 	--crepe-color-inline-area: var(--soft);
 	--crepe-color-inline-code: #a4573a;
-	--crepe-font-title: var(--sans);
-	--crepe-font-default: var(--sans);
-	--crepe-font-code: "Cascadia Mono", Consolas, monospace;
+	--crepe-font-title: var(--serif);
+	--crepe-font-default: var(--serif);
+	--crepe-font-code: var(--mono);
 	--crepe-base-font-size: 17px;
 	--crepe-shadow-1: 0 2px 10px rgb(60 40 20 / 0.08);
 	--crepe-shadow-2: 0 8px 28px rgb(60 40 20 / 0.12);
