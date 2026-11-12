@@ -151,7 +151,9 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 	</div>
 {/if}
 
-<style>
+<style lang="scss">
+@use "../styles/tokens" as t;
+
 aside {
 	display: flex;
 	flex-direction: column;
@@ -159,18 +161,22 @@ aside {
 	padding: 1.25rem 0.75rem 0.75rem;
 	box-sizing: border-box;
 }
+
 nav {
 	flex: 1;
 	overflow-y: auto;
 }
+
 ul {
 	list-style: none;
 	margin: 0;
 	padding: 0;
+
+	ul {
+		padding-left: 0.9rem;
+	}
 }
-ul ul {
-	padding-left: 0.9rem;
-}
+
 .item,
 .field {
 	display: block;
@@ -187,6 +193,7 @@ ul ul {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+
 .item {
 	background: none;
 	border: none;
@@ -194,29 +201,39 @@ ul ul {
 	transition:
 		background 0.15s,
 		color 0.15s;
+
+	&:hover {
+		background: var(--soft);
+	}
+
+	&.chapter {
+		color: var(--ink);
+		font-weight: 600;
+	}
+
+	&.active {
+		background: var(--soft);
+		color: var(--accent);
+	}
 }
-.item:hover {
-	background: var(--soft);
-}
-.item.chapter {
-	color: var(--ink);
-	font-weight: 600;
-}
-.item.active {
-	background: var(--soft);
-	color: var(--accent);
-}
+
 .field {
 	border: 1px solid var(--line);
 	background: var(--bg);
 	color: var(--ink);
 	outline: none;
 }
+
 .add {
 	display: flex;
 	gap: 0.25rem;
 	padding-top: 0.5rem;
+
+	.close {
+		margin-left: auto;
+	}
 }
+
 .add button,
 .menu button {
 	background: none;
@@ -228,14 +245,13 @@ ul ul {
 	padding: 0.35rem 0.6rem;
 	cursor: pointer;
 }
+
 .add button:hover,
 .menu button:hover:not(:disabled) {
 	background: var(--soft);
 	color: var(--ink);
 }
-.add .close {
-	margin-left: auto;
-}
+
 .menu {
 	position: fixed;
 	z-index: 10;
@@ -245,17 +261,20 @@ ul ul {
 	padding: 0.3rem;
 	background: var(--bg);
 	border-radius: 12px;
-	box-shadow: 0 8px 28px rgb(60 40 20 / 0.14);
-}
-.menu button {
-	text-align: left;
-	font-size: 0.85rem;
-}
-.menu button:disabled {
-	opacity: 0.35;
-	cursor: default;
-}
-.menu .danger:hover {
-	color: #b4533c;
+	box-shadow: t.$shadow-menu;
+
+	button {
+		text-align: left;
+		font-size: 0.85rem;
+
+		&:disabled {
+			opacity: 0.35;
+			cursor: default;
+		}
+	}
+
+	.danger:hover {
+		color: #b4533c;
+	}
 }
 </style>

@@ -7,7 +7,7 @@ import "@fontsource/shippori-mincho/600.css";
 import "@fontsource/shippori-mincho/700.css";
 import "@fontsource/shippori-mincho/800.css";
 import "katex/dist/katex.min.css";
-import "./app.css";
+import "./app.scss";
 import App from "./App.svelte";
 
 const target = document.getElementById("app");

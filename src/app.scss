@@ -1,0 +1,96 @@
+@use "./styles/tokens" as t;
+
+:root {
+	--bg: #{t.$bg};
+	--side: #{t.$side};
+	--soft: #{t.$soft};
+	--line: #{t.$line};
+
+	--ink: #{t.$ink};
+	--muted: #{t.$muted};
+	--accent: #{t.$accent};
+
+	--serif: #{t.$font-serif};
+	--sans: #{t.$font-sans};
+	--mono: #{t.$font-mono};
+
+	font-family: var(--sans);
+	color: var(--ink);
+	background: var(--bg);
+	-webkit-font-smoothing: antialiased;
+}
+
+html,
+body,
+#app {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: var(--bg);
+}
+
+::selection {
+	background: t.$selection;
+}
+
+::-webkit-scrollbar {
+	width: 10px;
+
+	&-thumb {
+		background: var(--soft);
+		border-radius: 10px;
+		border: 3px solid var(--bg);
+	}
+}
+
+// Milkdown theme変数にアプリのトークンを割り当てる。
+#app .milkdown {
+	--crepe-color-background: transparent;
+	--crepe-color-on-background: var(--ink);
+	--crepe-color-surface: var(--bg);
+	--crepe-color-surface-low: var(--side);
+	--crepe-color-on-surface: var(--ink);
+	--crepe-color-on-surface-variant: var(--muted);
+	--crepe-color-outline: var(--line);
+	--crepe-color-primary: var(--accent);
+	--crepe-color-secondary: var(--soft);
+	--crepe-color-on-secondary: var(--ink);
+	--crepe-color-hover: var(--soft);
+	--crepe-color-selected: #{t.$selection};
+	--crepe-color-inline-area: var(--soft);
+	--crepe-color-inline-code: #{t.$code-inline};
+	--crepe-font-title: var(--serif);
+	--crepe-font-default: var(--serif);
+	--crepe-font-code: var(--mono);
+	--crepe-base-font-size: 17px;
+	--crepe-shadow-1: #{t.$shadow-editor-1};
+	--crepe-shadow-2: #{t.$shadow-editor-2};
+
+	.ProseMirror {
+		line-height: 1.95;
+		padding: 0 72px;
+	}
+
+	// 日本語フォントがバックスラッシュを円記号で描画するため、コード領域の書体を等幅に固定する。
+	.cm-editor .cm-scroller,
+	.cm-content {
+		font-family: var(--crepe-font-code);
+	}
+
+	h1,
+	h2,
+	h3 {
+		margin-bottom: 0.6em;
+	}
+}
+
+@media print {
+	html,
+	body,
+	#app {
+		height: auto;
+		background: #fff;
+	}
+}

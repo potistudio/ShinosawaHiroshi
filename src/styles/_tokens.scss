@@ -1,0 +1,33 @@
+// アプリ全体で共有する色・フォント・影の定義。CSS変数の生成元として使用する。
+
+$bg: #fcfcfd;
+$side: #f8f8f9;
+$soft: #ece5dc;
+$line: #ddd3c8;
+
+$ink: #202020;
+$muted: #8a8077;
+$accent: #b0714a;
+
+$selection: #ecd9c6;
+$code-inline: #a4573a;
+
+$font-serif: "Shippori Mincho", "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
+$font-sans: "Inter Variable", "Inter", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+$font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+$shadow-editor-1: 0 2px 10px rgb(60 40 20 / 0.08);
+$shadow-editor-2: 0 8px 28px rgb(60 40 20 / 0.12);
+$shadow-float: 0 4px 16px rgb(60 40 20 / 0.08);
+$shadow-menu: 0 8px 28px rgb(60 40 20 / 0.14);
+$shadow-page:
+	0 1px 2px rgb(60 40 20 / 0.06),
+	0 8px 24px rgb(60 40 20 / 0.08);
+
+// 角丸ボタンの基本形を共有するためのミックスイン。
+@mixin pill-button {
+	font: inherit;
+	border: none;
+	cursor: pointer;
+	transition: background 0.15s;
+}

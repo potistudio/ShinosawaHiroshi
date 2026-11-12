@@ -46,7 +46,7 @@ onMount(() => {
 
 <div class="editor" bind:this={host}></div>
 
-<style>
+<style lang="scss">
 .editor {
 	max-width: 46rem;
 	margin: 0 auto;

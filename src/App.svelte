@@ -130,7 +130,9 @@ onMount(() => {
 	</div>
 {/if}
 
-<style>
+<style lang="scss">
+@use "./styles/tokens" as t;
+
 .welcome {
 	height: 100%;
 	display: flex;
@@ -138,47 +140,53 @@ onMount(() => {
 	align-items: center;
 	justify-content: center;
 	gap: 0.5rem;
+
+	h1 {
+		font-family: var(--serif);
+		font-weight: 500;
+		font-size: 2.6rem;
+		letter-spacing: 0.15em;
+		margin: 0;
+	}
+
+	p {
+		color: var(--muted);
+		margin: 0 0 2rem;
+	}
+
+	button {
+		background: var(--soft);
+		color: var(--ink);
+		padding: 0.7rem 1.6rem;
+		border-radius: 999px;
+
+		&:hover {
+			background: var(--line);
+		}
+	}
 }
-.welcome h1 {
-	font-family: var(--serif);
-	font-weight: 500;
-	font-size: 2.6rem;
-	letter-spacing: 0.15em;
-	margin: 0;
-}
-.welcome p {
-	color: var(--muted);
-	margin: 0 0 2rem;
-}
+
 .welcome button,
 .mode {
-	font: inherit;
-	border: none;
-	cursor: pointer;
-	transition: background 0.15s;
+	@include t.pill-button;
 }
-.welcome button {
-	background: var(--soft);
-	color: var(--ink);
-	padding: 0.7rem 1.6rem;
-	border-radius: 999px;
-}
-.welcome button:hover {
-	background: var(--line);
-}
+
 .app {
 	display: grid;
 	grid-template-columns: 15rem 1fr;
 	height: 100%;
 }
+
 .side {
 	background: var(--side);
 	min-width: 0;
 }
+
 .main {
 	position: relative;
 	overflow-y: auto;
 }
+
 .mode {
 	position: fixed;
 	right: 1.25rem;
@@ -189,26 +197,31 @@ onMount(() => {
 	padding: 0.55rem 1.2rem;
 	border-radius: 999px;
 	font-size: 0.85rem;
-	box-shadow: 0 4px 16px rgb(60 40 20 / 0.08);
+	box-shadow: t.$shadow-float;
+
+	&:hover {
+		background: var(--soft);
+		color: var(--ink);
+	}
 }
-.mode:hover {
-	background: var(--soft);
-	color: var(--ink);
-}
+
 .empty {
 	color: var(--muted);
 	text-align: center;
 	margin-top: 30vh;
 }
+
 @media print {
 	.app {
 		display: block;
 		height: auto;
 	}
+
 	.side,
 	.mode {
 		display: none;
 	}
+
 	.main {
 		overflow: visible;
 	}

@@ -102,10 +102,13 @@ const set = <K extends keyof BookConfig>(key: K, value: BookConfig[K]) => onconf
 	<div class="pages" class:busy bind:this={pages}></div>
 </div>
 
-<style>
+<style lang="scss">
+@use "../styles/tokens" as t;
+
 .preview {
 	min-height: 100%;
 }
+
 .settings {
 	position: sticky;
 	top: 0;
@@ -119,71 +122,83 @@ const set = <K extends keyof BookConfig>(key: K, value: BookConfig[K]) => onconf
 	backdrop-filter: blur(8px);
 	font-size: 0.85rem;
 	color: var(--muted);
+
+	input,
+	select,
+	button {
+		font: inherit;
+		color: var(--ink);
+		background: var(--soft);
+		border: none;
+		border-radius: 8px;
+		padding: 0.3rem 0.6rem;
+		width: 7rem;
+		outline: none;
+	}
+
+	input.title {
+		width: 10rem;
+	}
+
+	input[type="number"] {
+		width: 2.6rem;
+		margin-right: 0.2rem;
+	}
+
+	select,
+	button {
+		width: auto;
+		cursor: pointer;
+	}
+
+	button {
+		border-radius: 999px;
+		padding: 0.3rem 1rem;
+
+		&:hover {
+			background: var(--line);
+		}
+	}
 }
-.settings input,
-.settings select,
-.settings button {
-	font: inherit;
-	color: var(--ink);
-	background: var(--soft);
-	border: none;
-	border-radius: 8px;
-	padding: 0.3rem 0.6rem;
-	width: 7rem;
-	outline: none;
-}
-.settings input.title {
-	width: 10rem;
-}
-.settings input[type="number"] {
-	width: 2.6rem;
-	margin-right: 0.2rem;
-}
-.settings select,
-.settings button {
-	width: auto;
-	cursor: pointer;
-}
-.settings button {
-	border-radius: 999px;
-	padding: 0.3rem 1rem;
-}
-.settings button:hover {
-	background: var(--line);
-}
+
 .spacer {
 	flex: 1;
 }
+
 .pages {
 	padding: 1.5rem 0 4rem;
 	transition: opacity 0.3s;
+
+	&.busy {
+		opacity: 0.4;
+	}
+
+	:global(.pagedjs_pages) {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 1.5rem;
+	}
+
+	:global(.pagedjs_page) {
+		background: #fff;
+		border-radius: 2px;
+		box-shadow: t.$shadow-page;
+	}
 }
-.pages.busy {
-	opacity: 0.4;
-}
-.pages :global(.pagedjs_pages) {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: center;
-	gap: 1.5rem;
-}
-.pages :global(.pagedjs_page) {
-	background: #fff;
-	border-radius: 2px;
-	box-shadow:
-		0 1px 2px rgb(60 40 20 / 0.06),
-		0 8px 24px rgb(60 40 20 / 0.08);
-}
+
 @media print {
 	.settings {
 		display: none;
 	}
+
 	.pages {
 		padding: 0;
-	}
-	.pages :global(.pagedjs_page) {
-		box-shadow: none;
-		border-radius: 0;
+
+		:global(.pagedjs_page) {
+			box-shadow: none;
+			border-radius: 0;
+		}
 	}
 }
 </style>
