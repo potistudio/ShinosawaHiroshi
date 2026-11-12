@@ -36,6 +36,7 @@
     "@milkdown/kit": "^7.23.0",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.4",
+    "bits-ui": "^2.21.0",
     "katex": "^0.19.1",
     "pagedjs": "^0.4.3",
     "rehype-katex": "^7.0.1",
