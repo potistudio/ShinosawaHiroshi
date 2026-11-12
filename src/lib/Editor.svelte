@@ -1,5 +1,7 @@
 <script lang="ts">
 import { Crepe } from "@milkdown/crepe";
+import { EditorStatus, editorViewCtx } from "@milkdown/kit/core";
+import { TextSelection } from "@milkdown/kit/prose/state";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic.css";
 import { onMount } from "svelte";
@@ -15,12 +17,23 @@ let { root, file, value, onchange }: Props = $props();
 
 let host: HTMLDivElement;
 let page: HTMLDivElement | null = null;
+let crepe: Crepe | null = null;
 
-// 余白クリックを本文入力へ転送するため、ページ全体のクリックを ProseMirror に委譲する
+// 余白クリックのフォーカス先を文書末尾に固定するため、末尾選択の送出後に ProseMirror へフォーカスする
 function focusText(event: MouseEvent) {
 	const target = event.target as HTMLElement;
 	if (target.closest(".ProseMirror")) return;
 	if (target.closest("a, button, input, select, textarea, img, video, audio")) return;
+	const instance = crepe;
+	if (instance && instance.editor.status === EditorStatus.Created) {
+		instance.editor.action((ctx) => {
+			const view = ctx.get(editorViewCtx);
+			const end = view.state.doc.content.size;
+			view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(end), -1)));
+			view.focus();
+		});
+		return;
+	}
 	host.querySelector<HTMLElement>(".ProseMirror")?.focus();
 }
 
@@ -33,7 +46,7 @@ async function upload(image: File) {
 }
 
 onMount(() => {
-	const crepe = new Crepe({
+	const instance = new Crepe({
 		root: host,
 		defaultValue: value,
 		features: { [Crepe.Feature.TopBar]: false, [Crepe.Feature.AI]: false },
@@ -47,14 +60,16 @@ onMount(() => {
 			[Crepe.Feature.Placeholder]: { text: "Start writing…" },
 		},
 	});
-	crepe.on((l) => l.markdownUpdated((_, md, prev) => md !== prev && onchange(md)));
-	crepe.create();
+	crepe = instance;
+	instance.on((l) => l.markdownUpdated((_, md, prev) => md !== prev && onchange(md)));
+	instance.create();
 	// Tab による ProseMirror への到達は維持し、マウスクリックのみここで転送する
 	const surface = page;
 	surface?.addEventListener("click", focusText);
 	return () => {
 		surface?.removeEventListener("click", focusText);
-		crepe.destroy();
+		instance.destroy();
+		crepe = null;
 	};
 });
 </script>
