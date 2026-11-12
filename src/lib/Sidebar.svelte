@@ -125,6 +125,10 @@ function dragStart(e: DragEvent, parent: string, index: number, entry: Entry) {
 		e.preventDefault();
 		return;
 	}
+	const li = e.currentTarget as HTMLElement;
+	// Ignore dragstart bubbled from a nested list item; only the drag source handles it.
+	if ((e.target as HTMLElement | null)?.closest?.("li") !== li) return;
+	e.stopPropagation();
 	dragSrc = { parent, index, path: entry.path, dir: entry.dir };
 	dropPos = null;
 	dropInto = null;
@@ -141,11 +145,26 @@ function dragStart(e: DragEvent, parent: string, index: number, entry: Entry) {
 function dragOverRow(e: DragEvent, parent: string, index: number, entry: Entry) {
 	const src = dragSrc;
 	if (!src) return;
+	const li = e.currentTarget as HTMLElement;
+	// Ignore dragover bubbled from a nested list item.
+	if ((e.target as HTMLElement | null)?.closest?.("li") !== li) return;
 	e.preventDefault();
 	e.stopPropagation();
 	if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-	const el = e.currentTarget as HTMLElement;
-	const rect = el.getBoundingClientRect();
+	// The li of an expanded chapter contains its subtree; zones use the header row rect.
+	const rowEl = li.querySelector(":scope > .row") as HTMLElement | null;
+	const rect = (rowEl ?? li).getBoundingClientRect();
+	if (entry.dir && e.clientY > rect.bottom + 1) {
+		// Below the header row but inside the item (empty-chapter note): drop into the chapter.
+		if (entry.path === src.path || isInvalidDest(entry.path) || isCollapsed(entry.path)) {
+			dropPos = null;
+			dropInto = null;
+			return;
+		}
+		dropPos = null;
+		dropInto = entry.path;
+		return;
+	}
 	const ratio = (e.clientY - rect.top) / Math.max(1, rect.height);
 	if (entry.dir) {
 		if (ratio < 0.25) {
@@ -361,7 +380,7 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 	<ul class="tree" class:children={depth > 0}>
 		{#each entries as entry, index (entry.path)}
 			<li
-				draggable={!editing}
+				draggable={editing ? "false" : "true"}
 				class:dragging={dragSrc?.path === entry.path}
 				class:drop-before={dropPos?.parent === parent && dropPos.index === index}
 				class:drop-after={dropPos?.parent === parent && dropPos.index === index + 1}
@@ -374,6 +393,7 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 					{@render field(label(entry))}
 				{:else if entry.dir}
 					<div class="row" class:drop-into={dropInto === entry.path}>
+						<span class="grip" aria-hidden="true" title="Drag to reorder">⠿</span>
 						<button
 							type="button"
 							class="toggle"
@@ -381,6 +401,7 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 							aria-label={`${isCollapsed(entry.path) ? "Expand" : "Collapse"} ${label(entry)}`}
 							aria-expanded={!isCollapsed(entry.path)}
 							onclick={() => toggle(entry.path)}
+							draggable="false"
 						>
 							<span class="glyph" aria-hidden="true">{isCollapsed(entry.path) ? "▸" : "▾"}</span>
 						</button>
@@ -390,18 +411,12 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 						{#if entry.children.length > 0}
 							{@render list(entry.children, entry.path, depth + 1)}
 						{:else if !(editing?.kind === "new" && editing.parent === entry.path)}
-							<p
-								class="empty-note"
-								class:drop-into={dropInto === entry.path}
-								ondragover={(e) => dragOverEnd(e, entry.path, entry.children)}
-								ondrop={handleDrop}
-							>
-								No pages yet — drop here
-							</p>
+							<p class="empty-note">No pages yet</p>
 						{/if}
 					{/if}
 				{:else}
 					<div class="row">
+						<span class="grip" aria-hidden="true" title="Drag to reorder">⠿</span>
 						<span class="spacer" aria-hidden="true"></span>
 						{@render rowButton(entry, parent, index, entries, depth)}
 					</div>
@@ -464,6 +479,29 @@ ul {
 	display: flex;
 	align-items: center;
 	gap: 0.15rem;
+	border-radius: 8px;
+}
+
+.grip {
+	flex: none;
+	color: var(--muted);
+	opacity: 0;
+	cursor: grab;
+	font-size: 0.8rem;
+	line-height: 1;
+	padding: 0 0.1rem;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+li:hover > .row > .grip,
+.row:focus-within > .grip,
+li.dragging > .row > .grip {
+	opacity: 0.6;
+}
+
+li.dragging > .row > .grip {
+	cursor: grabbing;
 }
 
 .toggle {
@@ -565,12 +603,6 @@ ul {
 	color: var(--muted);
 	border-radius: 8px;
 	padding: 0.35rem 0.6rem;
-
-	&.drop-into {
-		background: var(--soft);
-		color: var(--accent);
-		outline: 1px dashed var(--accent);
-	}
 }
 
 li {
