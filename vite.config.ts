@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
 	plugins: [svelte()],
 	clearScreen: false,
-	// Crepe が内部で使う Vue のビルドフラグ。
+	// Vue build flags required internally by Crepe.
 	define: {
 		__VUE_OPTIONS_API__: true,
 		__VUE_PROD_DEVTOOLS__: false,

@@ -32,7 +32,7 @@ async function render(tree: Entry[], config: BookConfig) {
 	}
 }
 
-// 設定の変更は少し待ってからまとめて組み直す。
+// Debounce config edits. Rebuild the paged preview 300ms after the last change.
 let timer: ReturnType<typeof setTimeout>;
 $effect(() => {
 	const snapshot = $state.snapshot(config) as BookConfig;
@@ -55,17 +55,17 @@ const set = <K extends keyof BookConfig>(key: K, value: BookConfig[K]) => onconf
 		<input
 			class="title"
 			value={config.title}
-			placeholder="書名"
+			placeholder="Title"
 			onchange={(e) => set("title", e.currentTarget.value)}
 		>
-		<input value={config.author} placeholder="著者" onchange={(e) => set("author", e.currentTarget.value)}>
+		<input value={config.author} placeholder="Author" onchange={(e) => set("author", e.currentTarget.value)}>
 		<select value={config.size} onchange={(e) => set("size", e.currentTarget.value as BookConfig["size"])}>
 			{#each Object.keys(pageSizes) as size}
 				<option>{size}</option>
 			{/each}
 		</select>
 		<label
-			>文字
+			>Font size
 			<input
 				type="number"
 				min="6"
@@ -76,7 +76,7 @@ const set = <K extends keyof BookConfig>(key: K, value: BookConfig[K]) => onconf
 			>pt</label
 		>
 		<label
-			>行間
+			>Line height
 			<input
 				type="number"
 				min="1"
@@ -87,7 +87,7 @@ const set = <K extends keyof BookConfig>(key: K, value: BookConfig[K]) => onconf
 			></label
 		>
 		<label
-			>余白
+			>Margin
 			<input
 				type="number"
 				min="5"
@@ -97,7 +97,7 @@ const set = <K extends keyof BookConfig>(key: K, value: BookConfig[K]) => onconf
 			>mm</label
 		>
 		<span class="spacer"></span>
-		<button type="button" onclick={() => window.print()} disabled={busy}>印刷 / PDF</button>
+		<button type="button" onclick={() => window.print()} disabled={busy}>Print / PDF</button>
 	</div>
 	<div class="pages" class:busy bind:this={pages}></div>
 </div>

@@ -16,7 +16,7 @@ let config = $state<BookConfig | null>(null);
 let page = $state<{ file: string; text: string } | null>(null);
 let mode = $state<"edit" | "layout">("edit");
 
-// ---- 保存（入力が止まってから書き込む） ----
+// Coalesce rapid edits into a single write. Flush 500ms after the last change.
 let pending: { file: string; text: string } | null = null;
 let timer: ReturnType<typeof setTimeout>;
 
@@ -33,11 +33,11 @@ async function flush() {
 	if (p) await writeText(p.file, p.text);
 }
 
-// ---- 本とページ ----
+// Book lifecycle: open, navigate, mutate, and persist the active book.
 async function openBook(dir: string) {
 	await flush();
 	const [entries, cfg] = await Promise.all([listTree(dir), loadConfig(dir)]);
-	if (cfg.title === "無題の本") cfg.title = dir.split(sep).pop() ?? cfg.title;
+	if (cfg.title === "Untitled Book" || cfg.title === "無題の本") cfg.title = dir.split(sep).pop() ?? cfg.title;
 	root = dir;
 	tree = entries;
 	config = cfg;
@@ -48,12 +48,12 @@ async function openBook(dir: string) {
 }
 
 async function chooseBook() {
-	const dir = await open({ directory: true, title: "本のフォルダを選ぶ" });
+	const dir = await open({ directory: true, title: "Choose a book folder" });
 	if (typeof dir !== "string") return;
 	try {
 		await openBook(dir);
 	} catch (e) {
-		alert(`本のフォルダを開けませんでした。\n${dir}\n\n${e}`);
+		alert(`Could not open the book folder.\n${dir}\n\n${e}`);
 	}
 }
 
@@ -100,8 +100,8 @@ onMount(() => {
 {#if !root || !config}
 	<main class="welcome">
 		<h1>Shiori</h1>
-		<p>Markdown のフォルダを、そのまま一冊の本に。</p>
-		<button type="button" onclick={chooseBook}>本のフォルダを開く</button>
+		<p>Turn a folder of Markdown into a book.</p>
+		<button type="button" onclick={chooseBook}>Open a book folder</button>
 	</main>
 {:else}
 	<div class="app">
@@ -114,7 +114,7 @@ onMount(() => {
 				class="mode"
 				onclick={() => flush().then(() => (mode = mode === "edit" ? "layout" : "edit"))}
 			>
-				{mode === "edit" ? "組版" : "編集"}
+				{mode === "edit" ? "Layout" : "Edit"}
 			</button>
 			{#if mode === "layout"}
 				<Preview {tree} {config} onconfig={updateConfig} />
@@ -124,7 +124,7 @@ onMount(() => {
 					<Editor {root} {file} value={page.text} onchange={(md) => change(file, md)} />
 				{/key}
 			{:else}
-				<p class="empty">左の「＋ ページ」から書きはじめよう</p>
+				<p class="empty">Start writing with "+ Page" on the left</p>
 			{/if}
 		</main>
 	</div>

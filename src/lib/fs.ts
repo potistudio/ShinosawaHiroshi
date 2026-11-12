@@ -1,6 +1,6 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
-/** ディレクトリは章、`.md` ファイルはページ。 */
+/** Directories are chapters, `.md` files are pages. */
 export interface Entry {
 	name: string;
 	path: string;
@@ -22,7 +22,7 @@ export const dirname = (path: string) => path.slice(0, path.lastIndexOf(sep));
 
 const external = /^([a-z][a-z0-9+.-]*:|\/\/|#)/i;
 
-/** Markdown 内の相対 URL を `baseDir` 基準で解決し、WebView で読める URL にする。 */
+/** Resolve relative Markdown URLs against `baseDir` into WebView-readable URLs. */
 export function assetUrl(baseDir: string, url: string) {
 	if (!url || external.test(url)) return url;
 	const parts = baseDir.split(sep);

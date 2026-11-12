@@ -1,11 +1,13 @@
 :root {
-	--bg: #fbf8f4;
-	--side: #f4efe8;
+	--bg: #fcfcfd;
+	--side: #f8f8f9;
 	--soft: #ece5dc;
 	--line: #ddd3c8;
-	--ink: #3a332d;
+
+	--ink: #202020;
 	--muted: #8a8077;
 	--accent: #b0714a;
+
 	--serif: "Noto Serif JP", "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
 	--sans: "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
 
@@ -39,7 +41,7 @@ body {
 	border: 3px solid var(--bg);
 }
 
-/* Milkdown (Crepe) のテーマを紙面寄りの柔らかい配色に寄せる。 */
+/* Soften the Milkdown (Crepe) theme toward a paper-like palette. */
 #app .milkdown {
 	--crepe-color-background: transparent;
 	--crepe-color-on-background: var(--ink);
@@ -55,8 +57,8 @@ body {
 	--crepe-color-selected: #ecd9c6;
 	--crepe-color-inline-area: var(--soft);
 	--crepe-color-inline-code: #a4573a;
-	--crepe-font-title: var(--serif);
-	--crepe-font-default: var(--serif);
+	--crepe-font-title: var(--sans);
+	--crepe-font-default: var(--sans);
 	--crepe-font-code: "Cascadia Mono", Consolas, monospace;
 	--crepe-base-font-size: 17px;
 	--crepe-shadow-1: 0 2px 10px rgb(60 40 20 / 0.08);
@@ -68,7 +70,7 @@ body {
 	padding: 0 72px;
 }
 
-/* 日本語環境の既定 monospace はバックスラッシュが ¥ になるため、等幅フォントを明示する。 */
+/* Pin monospace fonts: the Japanese default renders backslashes as yen signs. */
 #app .milkdown .cm-editor .cm-scroller,
 #app .milkdown .cm-content {
 	font-family: var(--crepe-font-code);

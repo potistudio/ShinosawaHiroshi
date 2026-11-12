@@ -8,7 +8,7 @@ interface Props {
 	tree: Entry[];
 	current: string;
 	onopen: (file: string) => void;
-	/** 構成を変える操作。保存の確定・ツリーの再読込・開いているファイルの追従は呼び出し側が行う。 */
+	/** Structural mutation. The caller flushes pending writes, reloads the tree, and follows moved files. */
 	act: (op: () => Promise<Moved | string | undefined>) => void;
 	onclose: () => void;
 }
@@ -21,7 +21,7 @@ let editing = $state<Editing | null>(null);
 type Menu = { x: number; y: number; entry: Entry; parent: string; siblings: Entry[]; index: number; depth: number };
 let menu = $state<Menu | null>(null);
 
-/** メニュー項目のクリック処理。メニューが閉じる前に対象を確定させる。 */
+/** Snapshot the menu target before closing, so the action runs against a stable reference. */
 const pick = (op: (m: Menu) => void) => () => {
 	const m = $state.snapshot(menu) as Menu;
 	menu = null;
@@ -38,7 +38,7 @@ function commit(title: string) {
 }
 
 async function remove(entry: Entry) {
-	const ok = await ask(`「${label(entry)}」をごみ箱へ移動しますか？`, { kind: "warning" });
+	const ok = await ask(`Move "${label(entry)}" to trash?`, { kind: "warning" });
 	if (ok) act(() => trashPath(entry.path).then(() => undefined));
 }
 
@@ -99,15 +99,15 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 			type="button"
 			onclick={() => (editing = { kind: "new", parent: root, siblings: tree, dir: false, depth: 0 })}
 		>
-			＋ ページ
+			+ Page
 		</button>
 		<button
 			type="button"
 			onclick={() => (editing = { kind: "new", parent: root, siblings: tree, dir: true, depth: 0 })}
 		>
-			＋ 章
+			+ Chapter
 		</button>
-		<button type="button" class="close" onclick={onclose} title="別の本を開く">⌂</button>
+		<button type="button" class="close" onclick={onclose} title="Open another book">⌂</button>
 	</div>
 </aside>
 
@@ -127,27 +127,27 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 						}),
 				)}
 			>
-				ページを追加
+				Add page
 			</button>
 		{/if}
 		<button type="button" onclick={pick((m) => (editing = { kind: "rename", entry: m.entry, parent: m.parent }))}>
-			名前を変更
+			Rename
 		</button>
 		<button
 			type="button"
 			disabled={menu.index === 0}
 			onclick={pick((m) => act(() => moveEntry(m.parent, m.siblings, m.index, -1)))}
 		>
-			上へ
+			Move up
 		</button>
 		<button
 			type="button"
 			disabled={menu.index === menu.siblings.length - 1}
 			onclick={pick((m) => act(() => moveEntry(m.parent, m.siblings, m.index, 1)))}
 		>
-			下へ
+			Move down
 		</button>
-		<button type="button" class="danger" onclick={pick((m) => remove(m.entry))}>削除</button>
+		<button type="button" class="danger" onclick={pick((m) => remove(m.entry))}>Delete</button>
 	</div>
 {/if}
 

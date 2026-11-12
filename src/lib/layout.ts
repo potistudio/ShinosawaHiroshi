@@ -20,7 +20,7 @@ const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;
 
 const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => entities[c] ?? c);
 
-/** 本全体を 扉 → 目次 → 本文 の順に1つの HTML にまとめる。 */
+/** Combine the book into a single HTML document: cover, table of contents, then body. */
 export async function bookHtml(tree: Entry[], config: BookConfig) {
 	const body = document.createElement("div");
 	for (const { file, chapter } of readingOrder(tree)) {
@@ -43,11 +43,11 @@ export async function bookHtml(tree: Entry[], config: BookConfig) {
       <h1 class="book-title">${escapeHtml(config.title)}</h1>
       <p class="book-author">${escapeHtml(config.author)}</p>
     </section>
-    <nav class="toc"><h2 class="toc-title">目次</h2><ol>${toc.join("")}</ol></nav>
+    <nav class="toc"><h2 class="toc-title">Contents</h2><ol>${toc.join("")}</ol></nav>
     ${body.innerHTML}`;
 }
 
-/** Paged.js に渡す組版用 CSS。 */
+/** Typesetting CSS passed to Paged.js. */
 export function bookCss(config: BookConfig) {
 	const [w, h] = pageSizes[config.size] ?? pageSizes.A5;
 	return `
@@ -93,12 +93,12 @@ table { border-collapse: collapse; margin: 1em auto; font-size: 0.9em; }
 th, td { border-bottom: 1px solid #ddd3c8; padding: 0.3em 0.8em; }
 ul, ol { margin: 0.5em 0; padding-left: 1.5em; }
 hr { border: none; text-align: center; margin: 1.5em 0; }
-hr::after { content: '＊'; color: #9a9088; }
+hr::after { content: '*'; color: #9a9088; }
 .katex-display { margin: 1em 0; }
 `)}`;
 }
 
-/** 本文用のルールがアプリ本体の UI に効かないよう、各セレクタをページ内に限定する。 */
+/** Scope body rules to paged output so they never leak into app UI. */
 const scope = (css: string) =>
 	css.replace(
 		/([^{}]+)\{/g,
