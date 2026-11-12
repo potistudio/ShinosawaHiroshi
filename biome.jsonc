@@ -2,7 +2,7 @@
 	"$schema": "https://biomejs.dev/schemas/2.6.6/schema.json",
 	"files": {
 		"ignoreUnknown": true,
-		"includes": [ "**" ]
+		"includes": ["**"]
 	},
 	"vcs": {
 		"enabled": true,
@@ -60,7 +60,7 @@
 	},
 	"overrides": [
 		{
-			"includes": [ "web/static/**/*.svg" ],
+			"includes": ["web/static/**/*.svg"],
 			"linter": {
 				"enabled": false
 			}

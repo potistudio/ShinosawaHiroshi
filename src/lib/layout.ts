@@ -1,55 +1,56 @@
-import rehypeKatex from 'rehype-katex';
-import rehypeStringify from 'rehype-stringify';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import remarkParse from 'remark-parse';
-import remarkRehype from 'remark-rehype';
-import { unified } from 'unified';
-import { type BookConfig, pageSizes, readingOrder } from './book';
-import { type Entry, assetUrl, dirname, readText } from './fs';
+import rehypeKatex from "rehype-katex";
+import rehypeStringify from "rehype-stringify";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import remarkParse from "remark-parse";
+import remarkRehype from "remark-rehype";
+import { unified } from "unified";
+import { type BookConfig, pageSizes, readingOrder } from "./book";
+import { assetUrl, dirname, type Entry, readText } from "./fs";
 
 const markdown = unified()
-  .use(remarkParse)
-  .use(remarkGfm)
-  .use(remarkMath)
-  .use(remarkRehype)
-  .use(rehypeKatex)
-  .use(rehypeStringify);
+	.use(remarkParse)
+	.use(remarkGfm)
+	.use(remarkMath)
+	.use(remarkRehype)
+	.use(rehypeKatex)
+	.use(rehypeStringify);
 
-const escape = (s: string) =>
-  s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
+
+const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => entities[c] ?? c);
 
 /** 本全体を 扉 → 目次 → 本文 の順に1つの HTML にまとめる。 */
 export async function bookHtml(tree: Entry[], config: BookConfig) {
-  const body = document.createElement('div');
-  for (const { file, chapter } of readingOrder(tree)) {
-    const section = document.createElement('section');
-    if (chapter) section.className = 'chapter';
-    section.innerHTML = String(await markdown.process(await readText(file)));
-    for (const img of section.querySelectorAll('img')) {
-      img.src = assetUrl(dirname(file), img.getAttribute('src') ?? '');
-    }
-    body.append(section);
-  }
+	const body = document.createElement("div");
+	for (const { file, chapter } of readingOrder(tree)) {
+		const section = document.createElement("section");
+		if (chapter) section.className = "chapter";
+		section.innerHTML = String(await markdown.process(await readText(file)));
+		for (const img of section.querySelectorAll("img")) {
+			img.src = assetUrl(dirname(file), img.getAttribute("src") ?? "");
+		}
+		body.append(section);
+	}
 
-  const toc = [...body.querySelectorAll('h1, h2')].map((h, i) => {
-    h.id = `h-${i}`;
-    return `<li class="toc-${h.tagName.toLowerCase()}"><a href="#${h.id}">${escape(h.textContent ?? '')}</a></li>`;
-  });
+	const toc = [...body.querySelectorAll("h1, h2")].map((h, i) => {
+		h.id = `h-${i}`;
+		return `<li class="toc-${h.tagName.toLowerCase()}"><a href="#${h.id}">${escapeHtml(h.textContent ?? "")}</a></li>`;
+	});
 
-  return `
+	return `
     <section class="cover">
-      <h1 class="book-title">${escape(config.title)}</h1>
-      <p class="book-author">${escape(config.author)}</p>
+      <h1 class="book-title">${escapeHtml(config.title)}</h1>
+      <p class="book-author">${escapeHtml(config.author)}</p>
     </section>
-    <nav class="toc"><h2 class="toc-title">目次</h2><ol>${toc.join('')}</ol></nav>
+    <nav class="toc"><h2 class="toc-title">目次</h2><ol>${toc.join("")}</ol></nav>
     ${body.innerHTML}`;
 }
 
 /** Paged.js に渡す組版用 CSS。 */
 export function bookCss(config: BookConfig) {
-  const [w, h] = pageSizes[config.size] ?? pageSizes.A5;
-  return `
+	const [w, h] = pageSizes[config.size] ?? pageSizes.A5;
+	return `
 @page {
   size: ${w}mm ${h}mm;
   margin: ${config.margin}mm;
@@ -99,6 +100,11 @@ hr::after { content: '＊'; color: #9a9088; }
 
 /** 本文用のルールがアプリ本体の UI に効かないよう、各セレクタをページ内に限定する。 */
 const scope = (css: string) =>
-  css.replace(/([^{}]+)\{/g, (_, sel: string) =>
-    sel.split(',').map((s) => `.pagedjs_page ${s.trim()}`).join(', ') + ' {',
-  );
+	css.replace(
+		/([^{}]+)\{/g,
+		(_, sel: string) =>
+			`${sel
+				.split(",")
+				.map((s) => `.pagedjs_page ${s.trim()}`)
+				.join(", ")} {`,
+	);
