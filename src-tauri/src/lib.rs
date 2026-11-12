@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::fs;
 use std::path::Path;
 
-/// ページツリーの1要素。ディレクトリは章、`.md` ファイルはページを表す。
+/// One page-tree element. Directories are chapters, `.md` files are pages.
 #[derive(Serialize)]
 struct Entry {
     name: String,
@@ -17,8 +17,8 @@ fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 
-/// `.` または `_` で始まる名前は本の構成から除外する（画像置き場など）。
-/// `index.md` はディレクトリ自身の本文として扱うため、子要素には含めない。
+/// Exclude names starting with `.` or `_` (image storage, etc.).
+/// `index.md` is the body of its own directory, so it is excluded from children.
 fn is_listed(name: &str, is_dir: bool) -> bool {
     if name.starts_with('.') || name.starts_with('_') {
         return false;
@@ -26,8 +26,8 @@ fn is_listed(name: &str, is_dir: bool) -> bool {
     is_dir || (name.ends_with(".md") && name != "index.md")
 }
 
-/// 読み取れない要素（アクセス拒否など）とシンボリックリンク・ジャンクションは無視する。
-/// リンクを辿らないため、循環参照による無限再帰も起きない。
+/// Skip unreadable entries and symlinks/junctions.
+/// Links are never followed, so cyclic references cannot cause infinite recursion.
 fn read_dir(dir: &Path) -> CmdResult<Vec<Entry>> {
     let mut entries = Vec::new();
     for item in fs::read_dir(dir).map_err(err)?.flatten() {
@@ -65,7 +65,7 @@ fn list_tree(root: String) -> CmdResult<Vec<Entry>> {
     read_dir(Path::new(&root))
 }
 
-/// ファイルが存在しない場合は空文字列を返す。
+/// Return an empty string when the file does not exist.
 #[tauri::command]
 fn read_text(path: String) -> CmdResult<String> {
     match fs::read_to_string(&path) {
@@ -75,7 +75,7 @@ fn read_text(path: String) -> CmdResult<String> {
     }
 }
 
-/// 親ディレクトリが無い場合は作成してから書き込む。
+/// Create missing parent directories before writing.
 #[tauri::command]
 fn write_text(path: String, content: String) -> CmdResult<()> {
     if let Some(parent) = Path::new(&path).parent() {
@@ -84,7 +84,7 @@ fn write_text(path: String, content: String) -> CmdResult<()> {
     fs::write(&path, content).map_err(err)
 }
 
-/// 画像などのバイナリを書き込む。親ディレクトリが無い場合は作成する。
+/// Write binary data such as images. Create missing parent directories.
 #[tauri::command]
 fn write_bytes(path: String, bytes: Vec<u8>) -> CmdResult<()> {
     if let Some(parent) = Path::new(&path).parent() {
@@ -93,7 +93,7 @@ fn write_bytes(path: String, bytes: Vec<u8>) -> CmdResult<()> {
     fs::write(&path, bytes).map_err(err)
 }
 
-/// 移動先が既に存在する場合はエラーとし、上書きしない。
+/// Fail when the destination already exists instead of overwriting.
 #[tauri::command]
 fn rename_path(from: String, to: String) -> CmdResult<()> {
     if Path::new(&to).exists() {
@@ -102,7 +102,7 @@ fn rename_path(from: String, to: String) -> CmdResult<()> {
     fs::rename(&from, &to).map_err(err)
 }
 
-/// 削除はOSのごみ箱へ移動する。
+/// Move deletions to the OS trash.
 #[tauri::command]
 fn trash_path(path: String) -> CmdResult<()> {
     trash::delete(&path).map_err(err)
