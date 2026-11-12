@@ -1,4 +1,4 @@
-# Shinosawa
+# ShinosawaHiroshi
 
 > Minimal eBook writer.
 
