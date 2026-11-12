@@ -1,7 +1,7 @@
 <script lang="ts">
 import { ask } from "@tauri-apps/plugin-dialog";
 import { ContextMenu } from "bits-ui";
-import { addEntry, fileOf, label, type Moved, moveEntry, renameEntry } from "./book";
+import { addEntry, fileOf, label, type Moved, moveEntry, moveEntryTo, renameEntry, reorderEntry } from "./book";
 import { type Entry, sep, trashPath } from "./fs";
 
 interface Props {
@@ -85,6 +85,196 @@ $effect(() => {
 
 const isActive = (entry: Entry) => fileOf(entry) === current;
 const isAncestorActive = (entry: Entry) => entry.dir && current.startsWith(entry.path + sep);
+
+// Drag-and-drop reordering. HTML5 DnD only; keyboard and touch users keep Move up/down.
+type DragSrc = { parent: string; index: number; path: string; dir: boolean };
+let dragSrc = $state<DragSrc | null>(null);
+let dropPos = $state<{ parent: string; index: number } | null>(null);
+let dropInto = $state<string | null>(null);
+
+function siblingsOf(parent: string): Entry[] {
+	if (parent === root) return tree;
+	const find = (entries: Entry[]): Entry[] | null => {
+		for (const e of entries) {
+			if (e.dir && e.path === parent) return e.children;
+			if (e.dir) {
+				const inner = find(e.children);
+				if (inner) return inner;
+			}
+		}
+		return null;
+	};
+	return find(tree) ?? [];
+}
+
+function isInvalidDest(destParent: string) {
+	const src = dragSrc;
+	if (!src) return true;
+	if (!src.dir) return false;
+	return destParent === src.path || destParent.startsWith(src.path + sep);
+}
+
+function clearDrag() {
+	dragSrc = null;
+	dropPos = null;
+	dropInto = null;
+}
+
+function dragStart(e: DragEvent, parent: string, index: number, entry: Entry) {
+	if (editing) {
+		e.preventDefault();
+		return;
+	}
+	dragSrc = { parent, index, path: entry.path, dir: entry.dir };
+	dropPos = null;
+	dropInto = null;
+	if (e.dataTransfer) {
+		e.dataTransfer.effectAllowed = "move";
+		try {
+			e.dataTransfer.setData("text/plain", entry.path);
+		} catch {
+			// Clipboard access can throw in some browsers; drag state already covers the move.
+		}
+	}
+}
+
+function dragOverRow(e: DragEvent, parent: string, index: number, entry: Entry) {
+	const src = dragSrc;
+	if (!src) return;
+	e.preventDefault();
+	e.stopPropagation();
+	if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+	const el = e.currentTarget as HTMLElement;
+	const rect = el.getBoundingClientRect();
+	const ratio = (e.clientY - rect.top) / Math.max(1, rect.height);
+	if (entry.dir) {
+		if (ratio < 0.25) {
+			if (isInvalidDest(parent)) {
+				dropPos = null;
+				dropInto = null;
+				return;
+			}
+			dropInto = null;
+			dropPos = { parent, index };
+		} else if (ratio > 0.75) {
+			if (isInvalidDest(parent)) {
+				dropPos = null;
+				dropInto = null;
+				return;
+			}
+			dropInto = null;
+			dropPos = { parent, index: index + 1 };
+		} else {
+			if (entry.path === src.path || isInvalidDest(entry.path)) {
+				dropPos = null;
+				dropInto = null;
+				return;
+			}
+			dropPos = null;
+			dropInto = entry.path;
+			return;
+		}
+	} else {
+		if (isInvalidDest(parent)) {
+			dropPos = null;
+			dropInto = null;
+			return;
+		}
+		dropInto = null;
+		dropPos = { parent, index: ratio < 0.5 ? index : index + 1 };
+	}
+	if (dropPos && src.parent === dropPos.parent) {
+		const sibs = siblingsOf(dropPos.parent);
+		const cur = sibs.findIndex((s) => s.path === src.path);
+		const from = cur >= 0 ? cur : src.index;
+		const to = dropPos.index > from ? dropPos.index - 1 : dropPos.index;
+		if (to === from) dropPos = null;
+	}
+}
+
+function dragOverEnd(e: DragEvent, parent: string, entries: Entry[]) {
+	const src = dragSrc;
+	if (!src) return;
+	e.preventDefault();
+	e.stopPropagation();
+	if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+	if (isInvalidDest(parent)) {
+		dropPos = null;
+		dropInto = null;
+		return;
+	}
+	if (src.parent === parent) {
+		const sibs = siblingsOf(parent);
+		const cur = sibs.findIndex((s) => s.path === src.path);
+		if (cur === sibs.length - 1 && entries.length === sibs.length) {
+			dropPos = null;
+			dropInto = null;
+			return;
+		}
+	}
+	dropInto = null;
+	dropPos = { parent, index: entries.length };
+}
+
+function handleDrop(e: DragEvent) {
+	e.preventDefault();
+	e.stopPropagation();
+	const src = dragSrc;
+	const pos = dropPos;
+	const into = dropInto;
+	if (!src) {
+		clearDrag();
+		return;
+	}
+	if (into) {
+		const srcSibs = [...siblingsOf(src.parent)];
+		const srcIdx = srcSibs.findIndex((s) => s.path === src.path);
+		const destSibs = [...siblingsOf(into)];
+		if (srcIdx < 0) {
+			clearDrag();
+			return;
+		}
+		if (src.parent === into && srcIdx === destSibs.length - 1) {
+			clearDrag();
+			return;
+		}
+		const sParent = src.parent;
+		const dParent = into;
+		const dIdx = destSibs.length;
+		clearDrag();
+		if (collapsed.has(dParent)) collapsed = new Set([...collapsed].filter((p) => p !== dParent));
+		act(() => moveEntryTo(sParent, srcSibs, srcIdx, dParent, destSibs, dIdx));
+		return;
+	}
+	if (pos) {
+		const srcSibs = [...siblingsOf(src.parent)];
+		const srcIdx = srcSibs.findIndex((s) => s.path === src.path);
+		const destSibs = [...siblingsOf(pos.parent)];
+		if (srcIdx < 0) {
+			clearDrag();
+			return;
+		}
+		if (src.parent === pos.parent) {
+			const to = pos.index > srcIdx ? pos.index - 1 : pos.index;
+			if (to === srcIdx) {
+				clearDrag();
+				return;
+			}
+			const sParent = src.parent;
+			clearDrag();
+			act(() => reorderEntry(sParent, srcSibs, srcIdx, to));
+		} else {
+			const sParent = src.parent;
+			const dParent = pos.parent;
+			const dIdx = pos.index;
+			clearDrag();
+			if (collapsed.has(dParent)) collapsed = new Set([...collapsed].filter((p) => p !== dParent));
+			act(() => moveEntryTo(sParent, srcSibs, srcIdx, dParent, destSibs, dIdx));
+		}
+		return;
+	}
+	clearDrag();
+}
 
 const focus = (el: HTMLInputElement) => {
 	el.focus();
@@ -170,11 +360,20 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 {#snippet list(entries: Entry[], parent: string, depth: number)}
 	<ul class="tree" class:children={depth > 0}>
 		{#each entries as entry, index (entry.path)}
-			<li>
+			<li
+				draggable={!editing}
+				class:dragging={dragSrc?.path === entry.path}
+				class:drop-before={dropPos?.parent === parent && dropPos.index === index}
+				class:drop-after={dropPos?.parent === parent && dropPos.index === index + 1}
+				ondragstart={(e) => dragStart(e, parent, index, entry)}
+				ondragover={(e) => dragOverRow(e, parent, index, entry)}
+				ondrop={handleDrop}
+				ondragend={clearDrag}
+			>
 				{#if editing?.kind === "rename" && editing.entry.path === entry.path}
 					{@render field(label(entry))}
 				{:else if entry.dir}
-					<div class="row">
+					<div class="row" class:drop-into={dropInto === entry.path}>
 						<button
 							type="button"
 							class="toggle"
@@ -191,7 +390,14 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 						{#if entry.children.length > 0}
 							{@render list(entry.children, entry.path, depth + 1)}
 						{:else if !(editing?.kind === "new" && editing.parent === entry.path)}
-							<p class="empty-note">No pages yet</p>
+							<p
+								class="empty-note"
+								class:drop-into={dropInto === entry.path}
+								ondragover={(e) => dragOverEnd(e, entry.path, entry.children)}
+								ondrop={handleDrop}
+							>
+								No pages yet — drop here
+							</p>
 						{/if}
 					{/if}
 				{:else}
@@ -204,6 +410,15 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 		{/each}
 		{#if editing?.kind === "new" && editing.parent === parent}
 			<li>{@render field("")}</li>
+		{/if}
+		{#if dragSrc && !editing}
+			<li
+				class="end-zone"
+				class:active={dropPos?.parent === parent && dropPos.index === entries.length}
+				ondragover={(e) => dragOverEnd(e, parent, entries)}
+				ondrop={handleDrop}
+				aria-hidden="true"
+			></li>
 		{/if}
 	</ul>
 {/snippet}
@@ -348,6 +563,60 @@ ul {
 	margin: 0 0 0.25rem 1.55rem;
 	font-size: 0.78rem;
 	color: var(--muted);
+	border-radius: 8px;
+	padding: 0.35rem 0.6rem;
+
+	&.drop-into {
+		background: var(--soft);
+		color: var(--accent);
+		outline: 1px dashed var(--accent);
+	}
+}
+
+li {
+	position: relative;
+	border-radius: 8px;
+
+	&.dragging {
+		opacity: 0.45;
+	}
+
+	&.drop-before::before,
+	&.drop-after::after {
+		content: "";
+		position: absolute;
+		left: 0.4rem;
+		right: 0.4rem;
+		height: 2px;
+		border-radius: 2px;
+		background: var(--accent);
+		pointer-events: none;
+	}
+
+	&.drop-before::before {
+		top: -2px;
+	}
+
+	&.drop-after::after {
+		bottom: -2px;
+	}
+}
+
+.row.drop-into .item {
+	background: var(--soft);
+	color: var(--accent);
+	outline: 1px dashed var(--accent);
+}
+
+.end-zone {
+	list-style: none;
+	height: 0.75rem;
+	border-radius: 8px;
+
+	&.active {
+		background: var(--soft);
+		outline: 1px dashed var(--accent);
+	}
 }
 
 .add {
