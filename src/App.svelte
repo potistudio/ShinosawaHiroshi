@@ -37,7 +37,7 @@ async function flush() {
 async function openBook(dir: string) {
 	await flush();
 	const [entries, cfg] = await Promise.all([listTree(dir), loadConfig(dir)]);
-	if (cfg.title === "Untitled Book" || cfg.title === "無題の本") cfg.title = dir.split(sep).pop() ?? cfg.title;
+	if (cfg.title === "Untitled Book") cfg.title = dir.split(sep).pop() ?? cfg.title;
 	root = dir;
 	tree = entries;
 	config = cfg;

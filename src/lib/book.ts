@@ -35,13 +35,7 @@ export async function loadConfig(root: string): Promise<BookConfig> {
 	const text = await readText(configPath(root));
 	if (!text) return { ...defaultConfig };
 	try {
-		const data = JSON.parse(text) as Partial<BookConfig>;
-		const parsed = { ...defaultConfig, ...data };
-		// Accept legacy Japanese trim-size keys written before the English rename.
-		const rawSize: unknown = (data as { size?: unknown }).size;
-		if (rawSize === "文庫") parsed.size = "Bunko";
-		if (rawSize === "新書") parsed.size = "Shinsho";
-		return parsed;
+		return { ...defaultConfig, ...(JSON.parse(text) as Partial<BookConfig>) };
 	} catch (e) {
 		throw new Error(`Cannot load book.json: ${e}`);
 	}
