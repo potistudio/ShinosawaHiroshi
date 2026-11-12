@@ -79,12 +79,22 @@ export async function renameEntry(parent: string, entry: Entry, title: string): 
 	return [[entry.path, to]];
 }
 
+/** Move element `from` to position `to` (post-removal index) and renumber siblings as 01, 02, ... */
+export async function reorderEntry(parent: string, siblings: Entry[], from: number, to: number): Promise<Moved> {
+	if (from < 0 || from >= siblings.length || to < 0 || to >= siblings.length || from === to) return [];
+	const order = [...siblings];
+	const [moving] = order.splice(from, 1);
+	order.splice(to, 0, moving);
+	return renumber(parent, order);
+}
+
 /** Move element `index` by `delta` and renumber siblings as 01, 02, ... */
 export async function moveEntry(parent: string, siblings: Entry[], index: number, delta: number): Promise<Moved> {
-	const to = index + delta;
-	if (to < 0 || to >= siblings.length) return [];
-	const order = [...siblings];
-	[order[index], order[to]] = [order[to], order[index]];
+	return reorderEntry(parent, siblings, index, index + delta);
+}
+
+/** Rename `entries` in place to 01, 02, ... via temporary names to avoid collisions. */
+async function renumber(parent: string, order: Entry[]): Promise<Moved> {
 	// Rename via temporary names to avoid collisions.
 	const temps = await Promise.all(
 		order.map(async (e, i) => {
@@ -100,6 +110,73 @@ export async function moveEntry(parent: string, siblings: Entry[], index: number
 		moved.push([e.path, final]);
 	}
 	return moved;
+}
+
+/** Move an entry to another chapter (or the book root) at `destIndex` (0..length, clamped). */
+export async function moveEntryTo(
+	srcParent: string,
+	srcSiblings: Entry[],
+	srcIndex: number,
+	destParent: string,
+	destSiblings: Entry[],
+	destIndex: number,
+): Promise<Moved> {
+	const moving = srcSiblings[srcIndex];
+	if (!moving) return [];
+	if (srcParent === destParent) {
+		const clamped = Math.max(0, Math.min(destIndex, srcSiblings.length));
+		const to = clamped > srcIndex ? clamped - 1 : clamped;
+		return reorderEntry(srcParent, srcSiblings, srcIndex, to);
+	}
+	if (moving.dir && (destParent === moving.path || destParent.startsWith(moving.path + sep))) {
+		throw new Error("Cannot move a chapter into itself.");
+	}
+	const clampedDest = Math.max(0, Math.min(destIndex, destSiblings.length));
+	// Stage the moving entry aside so renumbering both sides never collides.
+	const staging = join(srcParent, `.tmp-dnd-${Date.now()}-${moving.name}`);
+	await renamePath(moving.path, staging);
+	try {
+		const moved: Moved = [];
+		const remaining = [...srcSiblings.slice(0, srcIndex), ...srcSiblings.slice(srcIndex + 1)];
+		const srcTemps = await Promise.all(
+			remaining.map(async (e, i) => {
+				const temp = join(srcParent, `.tmp-dnd-src-${i}-${e.name}`);
+				await renamePath(e.path, temp);
+				return temp;
+			}),
+		);
+		for (const [i, e] of remaining.entries()) {
+			const final = join(srcParent, fileName(i + 1, label(e), e.dir));
+			await renamePath(srcTemps[i], final);
+			moved.push([e.path, final]);
+		}
+		const destTemps = await Promise.all(
+			destSiblings.map(async (e, i) => {
+				const temp = join(destParent, `.tmp-dnd-dst-${i}-${e.name}`);
+				await renamePath(e.path, temp);
+				return temp;
+			}),
+		);
+		const extended = [...destSiblings.slice(0, clampedDest), moving, ...destSiblings.slice(clampedDest)];
+		for (const [i, e] of extended.entries()) {
+			const final = join(destParent, fileName(i + 1, label(e), e.dir));
+			if (e.path === moving.path) await renamePath(staging, final);
+			else {
+				const origIndex = destSiblings.findIndex((d) => d.path === e.path);
+				await renamePath(destTemps[origIndex], final);
+			}
+			moved.push([e.path, final]);
+		}
+		return moved;
+	} catch (e) {
+		// Best effort rollback of the staged entry so it never stays hidden as `.tmp-dnd-*`.
+		try {
+			await renamePath(staging, moving.path);
+		} catch {
+			// Keep the original error when rollback itself fails.
+		}
+		throw e;
+	}
 }
 
 /** Resolve `path` through the remapping. Return unchanged when outside moved subtrees. */
