@@ -14,6 +14,15 @@ interface Props {
 let { root, file, value, onchange }: Props = $props();
 
 let host: HTMLDivElement;
+let page: HTMLDivElement | null = null;
+
+// 余白クリックを本文入力へ転送するため、ページ全体のクリックを ProseMirror に委譲する
+function focusText(event: MouseEvent) {
+	const target = event.target as HTMLElement;
+	if (target.closest(".ProseMirror")) return;
+	if (target.closest("a, button, input, select, textarea, img, video, audio")) return;
+	host.querySelector<HTMLElement>(".ProseMirror")?.focus();
+}
 
 /** Store pasted images under `_images/` and return the path relative to the page. */
 async function upload(image: File) {
@@ -40,13 +49,27 @@ onMount(() => {
 	});
 	crepe.on((l) => l.markdownUpdated((_, md, prev) => md !== prev && onchange(md)));
 	crepe.create();
-	return () => crepe.destroy();
+	// Tab による ProseMirror への到達は維持し、マウスクリックのみここで転送する
+	const surface = page;
+	surface?.addEventListener("click", focusText);
+	return () => {
+		surface?.removeEventListener("click", focusText);
+		crepe.destroy();
+	};
 });
 </script>
 
-<div class="editor" bind:this={host}></div>
+<div class="page" bind:this={page}>
+	<div class="editor" bind:this={host}></div>
+</div>
 
 <style lang="scss">
+.page {
+	min-height: 100%;
+	box-sizing: border-box;
+	cursor: text;
+}
+
 .editor {
 	max-width: 46rem;
 	margin: 0 auto;
