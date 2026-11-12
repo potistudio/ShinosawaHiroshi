@@ -1,5 +1,6 @@
 <script lang="ts">
 import { ask } from "@tauri-apps/plugin-dialog";
+import { ContextMenu } from "bits-ui";
 import { addEntry, fileOf, label, type Moved, moveEntry, renameEntry } from "./book";
 import { type Entry, trashPath } from "./fs";
 
@@ -18,15 +19,6 @@ type Editing =
 	| { kind: "rename"; entry: Entry; parent: string }
 	| { kind: "new"; parent: string; siblings: Entry[]; dir: boolean; depth: number };
 let editing = $state<Editing | null>(null);
-type Menu = { x: number; y: number; entry: Entry; parent: string; siblings: Entry[]; index: number; depth: number };
-let menu = $state<Menu | null>(null);
-
-/** Snapshot the menu target before closing, so the action runs against a stable reference. */
-const pick = (op: (m: Menu) => void) => () => {
-	const m = $state.snapshot(menu) as Menu;
-	menu = null;
-	op(m);
-};
 
 function commit(title: string) {
 	const e = editing;
@@ -53,8 +45,6 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 };
 </script>
 
-<svelte:window onclick={() => (menu = null)} />
-
 {#snippet field(value: string)}
 	<input class="field" {value} use:focus onkeydown={keys} onblur={(e) => commit(e.currentTarget.value)}>
 {/snippet}
@@ -66,20 +56,78 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 				{#if editing?.kind === "rename" && editing.entry.path === entry.path}
 					{@render field(label(entry))}
 				{:else}
-					<button
-						type="button"
-						class="item"
-						class:chapter={entry.dir}
-						class:active={fileOf(entry) === current}
-						onclick={() => onopen(fileOf(entry))}
-						oncontextmenu={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-							menu = { x: e.clientX, y: e.clientY, entry, parent, siblings: entries, index, depth };
-						}}
-					>
-						{label(entry)}
-					</button>
+					<ContextMenu.Root>
+						<ContextMenu.Trigger onclick={() => onopen(fileOf(entry))}>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									type="button"
+									class="item"
+									class:chapter={entry.dir}
+									class:active={fileOf(entry) === current}
+								>
+									{label(entry)}
+								</button>
+							{/snippet}
+						</ContextMenu.Trigger>
+						<ContextMenu.Portal>
+							<ContextMenu.Content class="menu" sideOffset={6}>
+								{#if entry.dir}
+									<ContextMenu.Item
+										class="menu-item"
+										textValue="Add page"
+										onSelect={() => {
+											editing = {
+												kind: "new",
+												parent: entry.path,
+												siblings: entry.children,
+												dir: false,
+												depth: depth + 1,
+											};
+										}}
+									>
+										Add page
+									</ContextMenu.Item>
+								{/if}
+								<ContextMenu.Item
+									class="menu-item"
+									textValue="Rename"
+									onSelect={() => {
+										editing = { kind: "rename", entry, parent };
+									}}
+								>
+									Rename
+								</ContextMenu.Item>
+								<ContextMenu.Item
+									class="menu-item"
+									textValue="Move up"
+									disabled={index === 0}
+									onSelect={() => {
+										act(() => moveEntry(parent, entries, index, -1));
+									}}
+								>
+									Move up
+								</ContextMenu.Item>
+								<ContextMenu.Item
+									class="menu-item"
+									textValue="Move down"
+									disabled={index === entries.length - 1}
+									onSelect={() => {
+										act(() => moveEntry(parent, entries, index, 1));
+									}}
+								>
+									Move down
+								</ContextMenu.Item>
+								<ContextMenu.Item
+									class="menu-item danger"
+									textValue="Delete"
+									onSelect={() => void remove(entry)}
+								>
+									Delete
+								</ContextMenu.Item>
+							</ContextMenu.Content>
+						</ContextMenu.Portal>
+					</ContextMenu.Root>
 				{/if}
 				{#if entry.dir}
 					{@render list(entry.children, entry.path, depth + 1)}
@@ -110,46 +158,6 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 		<button type="button" class="close" onclick={onclose} title="Open another book">⌂</button>
 	</div>
 </aside>
-
-{#if menu}
-	<div class="menu" style:left="{menu.x}px" style:top="{menu.y}px">
-		{#if menu.entry.dir}
-			<button
-				type="button"
-				onclick={pick(
-					(m) =>
-						(editing = {
-							kind: "new",
-							parent: m.entry.path,
-							siblings: m.entry.children,
-							dir: false,
-							depth: m.depth + 1,
-						}),
-				)}
-			>
-				Add page
-			</button>
-		{/if}
-		<button type="button" onclick={pick((m) => (editing = { kind: "rename", entry: m.entry, parent: m.parent }))}>
-			Rename
-		</button>
-		<button
-			type="button"
-			disabled={menu.index === 0}
-			onclick={pick((m) => act(() => moveEntry(m.parent, m.siblings, m.index, -1)))}
-		>
-			Move up
-		</button>
-		<button
-			type="button"
-			disabled={menu.index === menu.siblings.length - 1}
-			onclick={pick((m) => act(() => moveEntry(m.parent, m.siblings, m.index, 1)))}
-		>
-			Move down
-		</button>
-		<button type="button" class="danger" onclick={pick((m) => remove(m.entry))}>Delete</button>
-	</div>
-{/if}
 
 <style lang="scss">
 @use "../styles/tokens" as t;
@@ -234,8 +242,7 @@ ul {
 	}
 }
 
-.add button,
-.menu button {
+.add button {
 	background: none;
 	border: none;
 	border-radius: 8px;
@@ -244,17 +251,15 @@ ul {
 	color: var(--muted);
 	padding: 0.35rem 0.6rem;
 	cursor: pointer;
+
+	&:hover {
+		background: var(--soft);
+		color: var(--ink);
+	}
 }
 
-.add button:hover,
-.menu button:hover:not(:disabled) {
-	background: var(--soft);
-	color: var(--ink);
-}
-
+// Bits UI ContextMenu.Content に適用する。配置は Floating UI が制御するため position は指定しない。
 .menu {
-	position: fixed;
-	z-index: 10;
 	display: flex;
 	flex-direction: column;
 	min-width: 9rem;
@@ -262,18 +267,37 @@ ul {
 	background: var(--bg);
 	border-radius: 12px;
 	box-shadow: t.$shadow-menu;
+	outline: none;
+	z-index: 10;
+}
 
-	button {
-		text-align: left;
-		font-size: 0.85rem;
+.menu-item {
+	background: none;
+	border: none;
+	border-radius: 8px;
+	font: inherit;
+	font-size: 0.85rem;
+	text-align: left;
+	color: var(--muted);
+	padding: 0.35rem 0.6rem;
+	cursor: pointer;
+	outline: none;
+	user-select: none;
 
-		&:disabled {
-			opacity: 0.35;
-			cursor: default;
-		}
+	&:hover,
+	&[data-highlighted] {
+		background: var(--soft);
+		color: var(--ink);
 	}
 
-	.danger:hover {
+	&[data-disabled] {
+		opacity: 0.35;
+		cursor: default;
+	}
+
+	&.danger:hover,
+	&.danger[data-highlighted] {
+		background: var(--soft);
 		color: #b4533c;
 	}
 }
