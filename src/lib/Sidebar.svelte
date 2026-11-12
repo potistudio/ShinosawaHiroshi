@@ -120,41 +120,132 @@ function clearDrag() {
 	dropInto = null;
 }
 
-function dragStart(e: DragEvent, parent: string, index: number, entry: Entry) {
-	if (editing) {
-		e.preventDefault();
-		return;
-	}
-	const li = e.currentTarget as HTMLElement;
-	// Ignore dragstart bubbled from a nested list item; only the drag source handles it.
-	if ((e.target as HTMLElement | null)?.closest?.("li") !== li) return;
-	e.stopPropagation();
+// Pointer-driven reordering. Native HTML5 DnD never started a drag in the app
+// WebView, so dragging uses pointer events + hit testing instead. Keyboard users
+// keep Move up/down, plus ArrowUp/Down on the grip.
+let dragActive = $state(false);
+let startX = 0;
+let startY = 0;
+let navEl = $state<HTMLElement | null>(null);
+
+function gripDown(e: PointerEvent, parent: string, index: number, entry: Entry) {
+	if (editing || dragSrc) return;
+	if (e.button !== undefined && e.button !== 0) return;
+	e.preventDefault();
 	dragSrc = { parent, index, path: entry.path, dir: entry.dir };
 	dropPos = null;
 	dropInto = null;
-	if (e.dataTransfer) {
-		e.dataTransfer.effectAllowed = "move";
-		try {
-			e.dataTransfer.setData("text/plain", entry.path);
-		} catch {
-			// Clipboard access can throw in some browsers; drag state already covers the move.
-		}
+	dragActive = false;
+	startX = e.clientX;
+	startY = e.clientY;
+	window.addEventListener("pointermove", onWindowMove);
+	window.addEventListener("pointerup", onWindowUp);
+	window.addEventListener("pointercancel", onWindowCancel);
+	window.addEventListener("keydown", onWindowKey);
+	try {
+		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+	} catch {
+		// Capture is best effort; window listeners cover the drag either way.
 	}
 }
 
-function dragOverRow(e: DragEvent, parent: string, index: number, entry: Entry) {
+function gripKeys(e: KeyboardEvent, parent: string, entry: Entry) {
+	if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+	e.preventDefault();
+	const sibs = siblingsOf(parent);
+	const cur = sibs.findIndex((s) => s.path === entry.path);
+	if (cur < 0) return;
+	act(() => moveEntry(parent, sibs, cur, e.key === "ArrowUp" ? -1 : 1));
+}
+
+function onWindowMove(e: PointerEvent) {
+	if (!dragSrc) return;
+	if (!dragActive && Math.hypot(e.clientX - startX, e.clientY - startY) < 4) return;
+	dragActive = true;
+	autoScroll(e.clientY);
+	updateTarget(e.clientX, e.clientY);
+}
+
+function onWindowUp() {
+	const src = dragSrc;
+	const pos = dropPos;
+	const into = dropInto;
+	const commit = dragActive && src && (pos || into);
+	endPointerDrag();
+	if (commit && src) commitDrop(src, pos, into);
+}
+
+function onWindowCancel() {
+	endPointerDrag();
+}
+
+function onWindowKey(e: KeyboardEvent) {
+	if (e.key === "Escape") endPointerDrag();
+}
+
+function endPointerDrag() {
+	window.removeEventListener("pointermove", onWindowMove);
+	window.removeEventListener("pointerup", onWindowUp);
+	window.removeEventListener("pointercancel", onWindowCancel);
+	window.removeEventListener("keydown", onWindowKey);
+	dragActive = false;
+	clearDrag();
+}
+
+function autoScroll(y: number) {
+	const nav = navEl;
+	if (!nav) return;
+	const rect = nav.getBoundingClientRect();
+	const margin = 28;
+	const step = 10;
+	if (y < rect.top + margin) nav.scrollTop -= step;
+	else if (y > rect.bottom - margin) nav.scrollTop += step;
+}
+
+function updateTarget(x: number, y: number) {
 	const src = dragSrc;
 	if (!src) return;
-	const li = e.currentTarget as HTMLElement;
-	// Ignore dragover bubbled from a nested list item.
-	if ((e.target as HTMLElement | null)?.closest?.("li") !== li) return;
-	e.preventDefault();
-	e.stopPropagation();
-	if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-	// The li of an expanded chapter contains its subtree; zones use the header row rect.
-	const rowEl = li.querySelector(":scope > .row") as HTMLElement | null;
-	const rect = (rowEl ?? li).getBoundingClientRect();
-	if (entry.dir && e.clientY > rect.bottom + 1) {
+	const els = document.elementsFromPoint(x, y) as HTMLElement[];
+	const li = els.map((el) => el.closest?.("li[data-dnd-path]") as HTMLElement | null).find(Boolean);
+	if (li) {
+		const parent = li.dataset.dndParent ?? "";
+		const index = Number(li.dataset.dndIndex ?? -1);
+		const sibs = siblingsOf(parent);
+		const entry = sibs[index];
+		if (!entry || entry.path !== li.dataset.dndPath) {
+			dropPos = null;
+			dropInto = null;
+			return;
+		}
+		// The li of an expanded chapter contains its subtree; zones use the header row rect.
+		const rowEl = li.querySelector(":scope > .row") as HTMLElement | null;
+		setRowTarget(parent, index, entry, y, (rowEl ?? li).getBoundingClientRect());
+		return;
+	}
+	// Over the nav but on no item: append to the end of the book root.
+	const inNav = els.some((el) => el.closest?.("nav"));
+	if (!inNav || isInvalidDest(root)) {
+		dropPos = null;
+		dropInto = null;
+		return;
+	}
+	if (src.parent === root) {
+		const sibs = siblingsOf(root);
+		const cur = sibs.findIndex((s) => s.path === src.path);
+		if (cur === sibs.length - 1) {
+			dropPos = null;
+			dropInto = null;
+			return;
+		}
+	}
+	dropInto = null;
+	dropPos = { parent: root, index: siblingsOf(root).length };
+}
+
+function setRowTarget(parent: string, index: number, entry: Entry, clientY: number, rect: DOMRect) {
+	const src = dragSrc;
+	if (!src) return;
+	if (entry.dir && clientY > rect.bottom + 1) {
 		// Below the header row but inside the item (empty-chapter note): drop into the chapter.
 		if (entry.path === src.path || isInvalidDest(entry.path) || isCollapsed(entry.path)) {
 			dropPos = null;
@@ -165,7 +256,7 @@ function dragOverRow(e: DragEvent, parent: string, index: number, entry: Entry) 
 		dropInto = entry.path;
 		return;
 	}
-	const ratio = (e.clientY - rect.top) / Math.max(1, rect.height);
+	const ratio = (clientY - rect.top) / Math.max(1, rect.height);
 	if (entry.dir) {
 		if (ratio < 0.25) {
 			if (isInvalidDest(parent)) {
@@ -211,40 +302,7 @@ function dragOverRow(e: DragEvent, parent: string, index: number, entry: Entry) 
 	}
 }
 
-function dragOverEnd(e: DragEvent, parent: string, entries: Entry[]) {
-	const src = dragSrc;
-	if (!src) return;
-	e.preventDefault();
-	e.stopPropagation();
-	if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-	if (isInvalidDest(parent)) {
-		dropPos = null;
-		dropInto = null;
-		return;
-	}
-	if (src.parent === parent) {
-		const sibs = siblingsOf(parent);
-		const cur = sibs.findIndex((s) => s.path === src.path);
-		if (cur === sibs.length - 1 && entries.length === sibs.length) {
-			dropPos = null;
-			dropInto = null;
-			return;
-		}
-	}
-	dropInto = null;
-	dropPos = { parent, index: entries.length };
-}
-
-function handleDrop(e: DragEvent) {
-	e.preventDefault();
-	e.stopPropagation();
-	const src = dragSrc;
-	const pos = dropPos;
-	const into = dropInto;
-	if (!src) {
-		clearDrag();
-		return;
-	}
+function commitDrop(src: DragSrc, pos: { parent: string; index: number } | null, into: string | null) {
 	if (into) {
 		const srcSibs = [...siblingsOf(src.parent)];
 		const srcIdx = srcSibs.findIndex((s) => s.path === src.path);
@@ -380,20 +438,27 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 	<ul class="tree" class:children={depth > 0}>
 		{#each entries as entry, index (entry.path)}
 			<li
-				draggable={editing ? "false" : "true"}
+				data-dnd-path={entry.path}
+				data-dnd-parent={parent}
+				data-dnd-index={index}
 				class:dragging={dragSrc?.path === entry.path}
 				class:drop-before={dropPos?.parent === parent && dropPos.index === index}
 				class:drop-after={dropPos?.parent === parent && dropPos.index === index + 1}
-				ondragstart={(e) => dragStart(e, parent, index, entry)}
-				ondragover={(e) => dragOverRow(e, parent, index, entry)}
-				ondrop={handleDrop}
-				ondragend={clearDrag}
 			>
 				{#if editing?.kind === "rename" && editing.entry.path === entry.path}
 					{@render field(label(entry))}
 				{:else if entry.dir}
 					<div class="row" class:drop-into={dropInto === entry.path}>
-						<span class="grip" aria-hidden="true" title="Drag to reorder">⠿</span>
+						<button
+							type="button"
+							class="grip"
+							aria-label={`Drag to reorder ${label(entry)}`}
+							title={`Drag to reorder ${label(entry)}`}
+							onpointerdown={(e) => gripDown(e, parent, index, entry)}
+							onkeydown={(e) => gripKeys(e, parent, entry)}
+						>
+							⠿
+						</button>
 						<button
 							type="button"
 							class="toggle"
@@ -401,7 +466,6 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 							aria-label={`${isCollapsed(entry.path) ? "Expand" : "Collapse"} ${label(entry)}`}
 							aria-expanded={!isCollapsed(entry.path)}
 							onclick={() => toggle(entry.path)}
-							draggable="false"
 						>
 							<span class="glyph" aria-hidden="true">{isCollapsed(entry.path) ? "▸" : "▾"}</span>
 						</button>
@@ -416,7 +480,16 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 					{/if}
 				{:else}
 					<div class="row">
-						<span class="grip" aria-hidden="true" title="Drag to reorder">⠿</span>
+						<button
+							type="button"
+							class="grip"
+							aria-label={`Drag to reorder ${label(entry)}`}
+							title={`Drag to reorder ${label(entry)}`}
+							onpointerdown={(e) => gripDown(e, parent, index, entry)}
+							onkeydown={(e) => gripKeys(e, parent, entry)}
+						>
+							⠿
+						</button>
 						<span class="spacer" aria-hidden="true"></span>
 						{@render rowButton(entry, parent, index, entries, depth)}
 					</div>
@@ -426,20 +499,17 @@ const keys = (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
 		{#if editing?.kind === "new" && editing.parent === parent}
 			<li>{@render field("")}</li>
 		{/if}
-		{#if dragSrc && !editing}
-			<li
-				class="end-zone"
-				class:active={dropPos?.parent === parent && dropPos.index === entries.length}
-				ondragover={(e) => dragOverEnd(e, parent, entries)}
-				ondrop={handleDrop}
-				aria-hidden="true"
-			></li>
-		{/if}
+		<!-- List ends resolve via the nav fallback in updateTarget -->
 	</ul>
 {/snippet}
 
 <aside>
-	<nav>{@render list(tree, root, 0)}</nav>
+	<nav
+		bind:this={navEl}
+		class:drop-root-end={dropPos?.parent === root && dropPos.index === tree.length && tree.length === 0}
+	>
+		{@render list(tree, root, 0)}
+	</nav>
 	<div class="add">
 		<button type="button" onclick={() => beginNew(root, tree, false, 0)}>+ Page</button>
 		<button type="button" onclick={() => beginNew(root, tree, true, 0)}>+ Chapter</button>
@@ -490,8 +560,18 @@ ul {
 	font-size: 0.8rem;
 	line-height: 1;
 	padding: 0 0.1rem;
+	background: none;
+	border: none;
+	font: inherit;
 	user-select: none;
 	-webkit-user-select: none;
+	touch-action: none;
+
+	&:focus-visible {
+		opacity: 0.9;
+		outline: 1px solid var(--accent);
+		outline-offset: 1px;
+	}
 }
 
 li:hover > .row > .grip,
@@ -640,15 +720,10 @@ li {
 	outline: 1px dashed var(--accent);
 }
 
-.end-zone {
-	list-style: none;
-	height: 0.75rem;
-	border-radius: 8px;
-
-	&.active {
-		background: var(--soft);
-		outline: 1px dashed var(--accent);
-	}
+nav.drop-root-end {
+	outline: 1px dashed var(--accent);
+	outline-offset: -4px;
+	border-radius: 12px;
 }
 
 .add {
