@@ -2,6 +2,8 @@
 
 > Minimal eBook writer.
 
+<img width="1278" height="688" alt="Screenshot" src="https://github.com/user-attachments/assets/bbb263bc-9407-4699-8e06-436486df554c" />
+
 ## Status
 
 > [!WARNING]
