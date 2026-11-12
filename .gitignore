@@ -1,5 +1,16 @@
 # macOS dummy file
 .DS_Store
 
+# Node.js dependencies
+node_modules/
+
+# Artifacts
+dist/
+
+# Variables
+.env
+.env.*
+!.env.example
+
 # Personal references
 refs/
